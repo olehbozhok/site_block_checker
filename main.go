@@ -40,7 +40,7 @@ func main() {
 		getVal("DB_PASS"),
 		getVal("DB_HOST"),
 		getVal("DB_DBNAME"),
-		false,
+		true,
 	)
 	checkErr(err)
 
