@@ -13,7 +13,7 @@ import (
 )
 
 func startCheck(db *repo.DB) {
-	tick := time.Tick(time.Minute * 30)
+	tick := time.Tick(time.Minute * 5)
 	once := make(chan struct{}, 1)
 	once <- struct{}{}
 
