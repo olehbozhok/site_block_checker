@@ -107,6 +107,7 @@ func main() {
 
 			msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, buf.String())
 			msg.ReplyToMessageID = msgUpdate.MessageID
+			msg.DisableWebPagePreview = true
 			go bot.Send(msg)
 			return
 
