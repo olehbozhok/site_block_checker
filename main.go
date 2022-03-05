@@ -107,7 +107,7 @@ func main() {
 				log.Println("error on SetSubscribeTgBlockCheckerUser:", err)
 				return
 			}
-			msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, `Ви підписались, щоб відписатись на оновлення використайте команду /unsubscribe`)
+			msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, `Ви підписались на оновлення, щоб відписатись використайте команду /unsubscribe`)
 			go bot.Send(msg)
 			return
 		case "ru", "by":
