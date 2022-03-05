@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/olehbozhok/site_block_checker/proxy_util"
 	"github.com/olehbozhok/site_block_checker/repo"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func checkErr(err error) {
@@ -33,6 +35,15 @@ func getVal(key string) string {
 }
 
 func main() {
+	os.Mkdir("log", os.ModePerm)
+	log.SetOutput(&lumberjack.Logger{
+		Filename:   path.Join("log", "app.log"),
+		MaxSize:    5, // megabytes
+		MaxBackups: 5,
+		MaxAge:     28,   //days
+		Compress:   true, // disabled by default
+	})
+	log.Println("start")
 	// loads values from .env into the system
 	_ = godotenv.Load(".env")
 

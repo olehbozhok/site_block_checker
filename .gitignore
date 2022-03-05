@@ -17,3 +17,4 @@
 .env
 bot_bin
 bot_site_checker
+log/*
