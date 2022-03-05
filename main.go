@@ -205,6 +205,7 @@ func main() {
 			for _, user := range users {
 				<-tickerSend.C
 				msg := tgbotapi.NewMessage(user.TelegramChatID, msg)
+				msg.DisableWebPagePreview = true
 				go bot.Send(msg)
 			}
 		}
