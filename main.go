@@ -96,11 +96,9 @@ func main() {
 			}
 
 			for _, data := range list {
-				s := ""
+				s := "❌"
 				if data.IsActive {
 					s = "✅"
-				} else {
-					s = "❌"
 				}
 				buf.WriteString(fmt.Sprint(s, data.CheckURL.URL, "\n"))
 			}
