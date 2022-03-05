@@ -20,7 +20,7 @@ func InitDB(user, password, host, dbName string, migrate bool) (*DB, error) {
 	db.CreateBatchSize = 300
 
 	if migrate {
-		err = db.AutoMigrate(&CheckURL{}, &ProxyData{}, &CheckURLResult{})
+		err = db.AutoMigrate(&CheckURL{}, &ProxyData{}, &CheckURLResult{}, &TgBlockCheckerUser{})
 		if err != nil {
 			return nil, errors.Wrap(err, "error AutoMigrate")
 		}
@@ -67,7 +67,7 @@ func (r *DB) GetProxy(country string) (list []ProxyData, err error) {
 	return list, errors.Wrap(err, "could not get proxy list by country")
 }
 
-func (r *DB) GetCheckURLResultMINData(country string) (list []CheckURLResult, err error) {
+func (r *DB) GetCheckURLResultData(country string) (list []CheckURLResult, err error) {
 	err = r.db.Preload("CheckURL").
 		Where(&CheckURLResult{Country: country}, "country").
 		Find(&list).Error
@@ -77,4 +77,30 @@ func (r *DB) GetCheckURLResultMINData(country string) (list []CheckURLResult, er
 func (r *DB) UpdateCheckURLResult(v CheckURLResult) error {
 	err := r.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&v).Error
 	return errors.Wrap(err, "could not save CheckURLResult")
+}
+
+func (r *DB) GetTgBlockCheckerUsersSubscribed() (list []TgBlockCheckerUser, err error) {
+	err = r.db.Where(&TgBlockCheckerUser{SubscribeActive: true}, "subscribe_active").Find(&list).Error
+	return list, errors.Wrap(err, "could not get TgBlockCheckerUser list")
+}
+
+func (r *DB) SetSubscribeTgBlockCheckerUser(tgChatID int64, active bool) error {
+	user := TgBlockCheckerUser{
+		TelegramChatID:  tgChatID,
+		SubscribeActive: active,
+	}
+
+	tx := r.db.Model(&user).Where("telegram_chat_id = ?", tgChatID).Update("subscribe_active", active)
+	err := tx.Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) || tx.RowsAffected == 0 {
+		err := r.db.Create(&user).Error
+		if err != nil {
+			return errors.Wrapf(err, "could not create model TgBlockCheckerUser, chatID:%v, active:%v", tgChatID, active)
+		}
+	} else if err != nil {
+		return errors.Wrapf(err, "could not update model TgBlockCheckerUser, chatID:%v, active:%v", tgChatID, active)
+	}
+
+	return nil
 }

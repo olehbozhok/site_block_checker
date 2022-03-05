@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -70,6 +71,33 @@ func main() {
 /ru - Росія
 /by - Білорусь`)
 			go bot.Send(msg)
+
+			err := db.SetSubscribeTgBlockCheckerUser(msgUpdate.Chat.ID, true)
+			if err != nil {
+				log.Println("error on SetSubscribeTgBlockCheckerUser:", err)
+			}
+			return
+		case "unsubscribe":
+			err := db.SetSubscribeTgBlockCheckerUser(msgUpdate.Chat.ID, false)
+			if err != nil {
+				msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, `Сталась помилка при обробці`)
+				go bot.Send(msg)
+				log.Println("error on SetSubscribeTgBlockCheckerUser:", err)
+				return
+			}
+			msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, `Ви відписані, щоб підписатись на оновлення використайте команду /subscribe`)
+			go bot.Send(msg)
+			return
+		case "subscribe":
+			err := db.SetSubscribeTgBlockCheckerUser(msgUpdate.Chat.ID, true)
+			if err != nil {
+				msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, `Сталась помилка при обробці`)
+				go bot.Send(msg)
+				log.Println("error on SetSubscribeTgBlockCheckerUser:", err)
+				return
+			}
+			msg := tgbotapi.NewMessage(msgUpdate.Chat.ID, `Ви підписались, щоб відписатись на оновлення використайте команду /unsubscribe`)
+			go bot.Send(msg)
 			return
 		case "ru", "by":
 			buf := bytes.NewBuffer(nil)
@@ -80,11 +108,11 @@ func main() {
 			switch cmd {
 			case "ru":
 				buf.WriteString("Росії")
-				list, err = db.GetCheckURLResultMINData("RU")
+				list, err = db.GetCheckURLResultData("RU")
 
 			case "by":
 				buf.WriteString("Білорусі")
-				list, err = db.GetCheckURLResultMINData("BY")
+				list, err = db.GetCheckURLResultData("BY")
 			}
 			buf.WriteString("\n\n")
 			if err != nil {
@@ -164,7 +192,25 @@ func main() {
 		}()
 	}
 
-	go startCheck(db)
+	// gorutine to send message to all chat
+	messageChan := make(chan string, 50)
+	go func() {
+		tickerSend := time.NewTicker(time.Second / 30)
+		for msg := range messageChan {
+			users, err := db.GetTgBlockCheckerUsersSubscribed()
+			if err != nil {
+				log.Println("GetTgBlockCheckerUsersSubscribed error:", err)
+				continue
+			}
+			for _, user := range users {
+				<-tickerSend.C
+				msg := tgbotapi.NewMessage(user.TelegramChatID, msg)
+				go bot.Send(msg)
+			}
+		}
+	}()
+
+	go startCheck(db, messageChan)
 
 	wg.Wait()
 

@@ -52,3 +52,9 @@ func (d *ProxyData) GetClient() (*proxy_util.Client, error) {
 	d.client = client
 	return client, nil
 }
+
+type TgBlockCheckerUser struct {
+	gorm.Model
+	TelegramChatID  int64 `gorm:"index,unique"`
+	SubscribeActive bool
+}

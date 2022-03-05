@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -12,7 +14,7 @@ import (
 	"github.com/olehbozhok/site_block_checker/repo"
 )
 
-func startCheck(db *repo.DB) {
+func startCheck(db *repo.DB, msgChan chan<- string) {
 	tick := time.Tick(time.Minute * 5)
 	once := make(chan struct{}, 1)
 	once <- struct{}{}
@@ -59,6 +61,18 @@ func startCheck(db *repo.DB) {
 		check := func(country string, proxyList []repo.ProxyData) {
 			defer wg.Done()
 
+			oldCheckResultData, err := db.GetCheckURLResultData(country)
+			if err != nil {
+				log.Println("on check sites could not get GetCheckURLResultData:", err)
+				return
+			}
+			oldCheckResultMap := make(map[uint]*repo.CheckURLResult)
+			for i := range oldCheckResultData {
+				oldCheckResultMap[oldCheckResultData[i].CheckUrlID] = &(oldCheckResultData[i])
+			}
+			var becameActiveURL []string
+			var becameInactiveURL []string
+
 			if len(proxyList) == 0 {
 				log.Println("no proxy for country ", country)
 				return
@@ -86,10 +100,57 @@ func startCheck(db *repo.DB) {
 					if err != nil {
 						log.Println("couldUpdateCheckURLResult proxyID id:", proxy.ID, " , site id: ", urlData.ID, " , url: ", urlData.URL, " , error:", err)
 					}
+
+					// check if change status
+					oldCheck := oldCheckResultMap[checkResult.CheckUrlID]
+					if oldCheck == nil {
+						break
+					}
+					if oldCheck.IsActive && !checkResult.IsActive {
+						becameInactiveURL = append(becameInactiveURL, urlData.URL)
+					} else if !oldCheck.IsActive && checkResult.IsActive {
+						becameActiveURL = append(becameActiveURL, urlData.URL)
+					}
 					break
 				}
 			}
 			log.Println("done handle urls by country: ", country)
+
+			if len(becameActiveURL) == 0 && len(becameInactiveURL) == 0 {
+				return
+			}
+			// gen message about changes
+
+			buf := bytes.NewBuffer(nil)
+			buf.WriteString("Зміна доступу до сайтів ")
+			switch country {
+			case "RU":
+				buf.WriteString("Росії")
+			case "BY":
+				buf.WriteString("Білорусі")
+			}
+
+			buf.WriteString("\n\n")
+			if len(becameInactiveURL) != 0 {
+				buf.WriteString("Стали не активними:\n")
+				for _, url := range becameInactiveURL {
+					buf.WriteString(fmt.Sprintln("❌", url))
+				}
+				buf.WriteString("\n")
+			}
+
+			if len(becameActiveURL) != 0 {
+				buf.WriteString("Стали активними:\n")
+				for _, url := range becameActiveURL {
+					buf.WriteString(fmt.Sprintln("✅", url))
+				}
+				buf.WriteString("\n")
+			}
+
+			buf.WriteString("Відписатись /unsubscribe")
+			go func() {
+				msgChan <- buf.String()
+			}()
 		}
 
 		go check("RU", ruProxyList)
